@@ -3,13 +3,21 @@ import { useSnapshot } from "@/hooks/use-snapshots";
 import { ChainSelector } from "@/components/ChainSelector";
 import { TokenTable } from "@/components/TokenTable";
 import { StatsCard } from "@/components/StatsCard";
-import { Activity, Coins, Globe, History, RefreshCcw } from "lucide-react";
+import { Activity, Coins, Globe, History, RefreshCcw, Search } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
+import { Input } from "@/components/ui/input";
 
 export default function Dashboard() {
   const [chain, setChain] = useState<string>("ethereum");
+  const [searchQuery, setSearchQuery] = useState("");
   const { data: snapshot, isLoading, isError, error, isRefetching } = useSnapshot(chain);
+
+  // Filter entries based on search query
+  const filteredEntries = snapshot?.entries.filter(entry => 
+    entry.token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    entry.token.name.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
 
   // Computed stats from snapshot data
   const totalLiquidity = snapshot?.entries.reduce((acc, curr) => acc + curr.liquidityUSD, 0) || 0;
@@ -94,16 +102,25 @@ export default function Dashboard() {
 
         {/* Main Data Table */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <Activity className="w-5 h-5 text-primary" />
               Top Tokens
             </h3>
-            {/* Additional filters could go here */}
+            
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search tokens..."
+                className="pl-9 bg-background/50 border-border/50 focus:border-primary/50"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
 
           <TokenTable 
-            entries={snapshot?.entries || []} 
+            entries={filteredEntries} 
             isLoading={isLoading} 
           />
         </div>

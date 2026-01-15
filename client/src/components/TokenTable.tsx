@@ -89,9 +89,20 @@ export function TokenTable({ entries, isLoading }: TokenTableProps) {
               >
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-xs font-bold text-primary ring-1 ring-primary/20 group-hover:ring-primary/40 transition-all">
-                      {entry.token.symbol[0]}
-                    </div>
+                    {entry.token.logoURI ? (
+                      <img 
+                        src={entry.token.logoURI} 
+                        alt={entry.token.symbol}
+                        className="w-8 h-8 rounded-full ring-1 ring-border shadow-sm object-contain bg-white"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${entry.token.symbol}&background=random&color=fff`;
+                        }}
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-xs font-bold text-primary ring-1 ring-primary/20 group-hover:ring-primary/40 transition-all">
+                        {entry.token.symbol[0]}
+                      </div>
+                    )}
                     <div>
                       <div className="text-foreground font-bold">{entry.token.symbol}</div>
                       <div className="text-xs text-muted-foreground font-mono">{entry.token.address.slice(0, 6)}...{entry.token.address.slice(-4)}</div>
