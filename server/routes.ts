@@ -22,22 +22,10 @@ export async function registerRoutes(
   app.get(api.snapshots.getLatest.path, async (req, res) => {
     try {
       const chain = req.params.chain;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const limit = parseInt(req.query.limit as string) || 25;
       
-      // Try to get from cache first, if not generate new
-      let snapshot = snapshotService.getLatestSnapshot(chain);
-      
-      if (!snapshot) {
-        // In a real app, this might trigger a background job or wait
-        // For prototype, we generate on demand
-        snapshot = await snapshotService.generateSnapshot(chain);
-      } else {
-        // Background refresh simulation: 
-        // If snapshot is older than 5 seconds, regenerate in background
-        if (Date.now() - snapshot.timestamp > 5000) {
-           snapshotService.generateSnapshot(chain).catch(console.error);
-        }
-      }
-
+      const snapshot = await snapshotService.generateSnapshot(chain, offset, limit);
       res.json(snapshot);
     } catch (error) {
       if (error instanceof Error && error.message.includes("No adapter")) {

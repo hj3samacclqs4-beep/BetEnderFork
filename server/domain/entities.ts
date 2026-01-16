@@ -5,6 +5,7 @@ export interface Token {
   name: string;
   address: string;
   decimals: number;
+  logoURI?: string;
 }
 
 export interface Pool {

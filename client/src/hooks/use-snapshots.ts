@@ -1,12 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { SnapshotResponse } from "@shared/schema";
 
 export function useSnapshot(chain: string) {
-  return useQuery({
+  return useInfiniteQuery<SnapshotResponse>({
     queryKey: [api.snapshots.getLatest.path, chain],
-    queryFn: async () => {
-      const url = buildUrl(api.snapshots.getLatest.path, { chain });
+    queryFn: async ({ pageParam = 0 }) => {
+      const url = `${buildUrl(api.snapshots.getLatest.path, { chain })}?offset=${pageParam}&limit=25`;
       const res = await fetch(url);
       
       if (!res.ok) {
@@ -16,14 +16,15 @@ export function useSnapshot(chain: string) {
         throw new Error('Failed to fetch snapshot data');
       }
       
-      const data = await res.json();
-      // Using the Zod schema from the API definition to parse/validate would be ideal here
-      // api.snapshots.getLatest.responses[200].parse(data);
-      return data as SnapshotResponse;
+      return res.json();
     },
-    // Auto-refresh every 10 seconds as per requirements
-    refetchInterval: 10000, 
-    // Keep data fresh for 5 seconds to prevent immediate refetch on mount if recently fetched
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const nextOffset = allPages.length * 25;
+      // We assume there are 1000 tokens in the registry
+      return nextOffset < 1000 ? nextOffset : undefined;
+    },
+    refetchInterval: 10000,
     staleTime: 5000,
   });
 }

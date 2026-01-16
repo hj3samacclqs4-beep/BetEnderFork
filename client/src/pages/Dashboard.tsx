@@ -11,18 +11,31 @@ import { Input } from "@/components/ui/input";
 export default function Dashboard() {
   const [chain, setChain] = useState<string>("ethereum");
   const [searchQuery, setSearchQuery] = useState("");
-  const { data: snapshot, isLoading, isError, error, isRefetching } = useSnapshot(chain);
+  const { 
+    data, 
+    fetchNextPage, 
+    hasNextPage, 
+    isFetchingNextPage, 
+    isLoading, 
+    isError, 
+    error, 
+    isRefetching 
+  } = useSnapshot(chain);
+
+  // Flatten all pages of entries
+  const allEntries = data?.pages.flatMap(page => page.entries) || [];
 
   // Filter entries based on search query
-  const filteredEntries = snapshot?.entries.filter(entry => 
+  const filteredEntries = allEntries.filter(entry => 
     entry.token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
     entry.token.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  );
 
-  // Computed stats from snapshot data
-  const totalLiquidity = snapshot?.entries.reduce((acc, curr) => acc + curr.liquidityUSD, 0) || 0;
-  const totalVolume = snapshot?.entries.reduce((acc, curr) => acc + curr.volumeUSD, 0) || 0;
-  const activeTokens = snapshot?.entries.length || 0;
+  // Computed stats from first page (as proxy)
+  const snapshot = data?.pages[0];
+  const totalLiquidity = allEntries.reduce((acc, curr) => acc + curr.liquidityUSD, 0) || 0;
+  const totalVolume = allEntries.reduce((acc, curr) => acc + curr.volumeUSD, 0) || 0;
+  const activeTokens = allEntries.length || 0;
 
   const formatLarge = (val: number) => {
     if (val >= 1e9) return `$${(val / 1e9).toFixed(2)}B`;
@@ -123,6 +136,18 @@ export default function Dashboard() {
             entries={filteredEntries} 
             isLoading={isLoading} 
           />
+
+          {hasNextPage && (
+            <div className="flex justify-center py-8">
+              <button
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="px-6 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-full transition-colors font-medium text-sm"
+              >
+                {isFetchingNextPage ? 'Loading more...' : 'Load More Tokens'}
+              </button>
+            </div>
+          )}
         </div>
       </main>
     </div>
