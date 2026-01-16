@@ -1,0 +1,48 @@
+import { Token, Pool } from "../../domain/entities";
+import { IChainAdapter } from "./MockAdapter";
+import { ethers } from "ethers";
+
+/**
+ * Example EthersAdapter implementation.
+ * You can copy this to a new file like EthereumAdapter.ts
+ */
+export class EthersAdapter implements IChainAdapter {
+  private chainName: string;
+  private provider: ethers.JsonRpcProvider;
+  private stableTokenAddress: string;
+
+  constructor(chainName: string, rpcUrl: string, stableTokenAddress: string) {
+    this.chainName = chainName;
+    this.provider = new ethers.JsonRpcProvider(rpcUrl);
+    this.stableTokenAddress = stableTokenAddress;
+  }
+
+  getChainName(): string {
+    return this.chainName;
+  }
+
+  getStableTokenAddress(): string {
+    return this.stableTokenAddress;
+  }
+
+  async getTopPools(limit: number): Promise<Pool[]> {
+    /**
+     * IMPLEMENTATION STEPS:
+     * 1. Connect to Uniswap/Quickswap Factory contract
+     * 2. Fetch the most liquid pools for the tokens in our registry
+     * 3. Return the Pool entities with real reserve data from the blockchain
+     * 
+     * Example (Pseudocode):
+     * const factory = new ethers.Contract(FACTORY_ADDR, ABI, this.provider);
+     * const poolAddr = await factory.getPool(tokenA, tokenB, fee);
+     * const poolContract = new ethers.Contract(poolAddr, POOL_ABI, this.provider);
+     * const slot0 = await poolContract.slot0(); // or getReserves()
+     */
+    
+    console.log(`Connecting to ${this.chainName} RPC at ${this.provider._getConnection().url}`);
+    
+    // For now, return empty to let the SnapshotService fallback to mock data
+    // while you finish the implementation.
+    return [];
+  }
+}
