@@ -22,9 +22,9 @@ export async function registerRoutes(
 
   const ethereumAdapter = ethRpc 
     ? new EthersAdapter("ethereum", ethRpc, "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", process.env.ETHERSCAN1 || "")
-    : new MockAdapter("ethereum");
+    : new MockAdapter("ethereum") as any;
 
-  const polygonAdapter = new MockAdapter("polygon");
+  const polygonAdapter = new MockAdapter("polygon") as any;
 
   // 2. Initialize Service (Application Layer)
   const snapshotService = new SnapshotService([ethereumAdapter, polygonAdapter]);

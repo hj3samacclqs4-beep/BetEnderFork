@@ -5,6 +5,7 @@ export interface IChainAdapter {
   getChainName(): string;
   getTopPools(limit: number): Promise<Pool[]>;
   getStableTokenAddress(): string;
+  getBatchPoolData(poolAddresses: string[]): Promise<any[]>;
 }
 
 export class MockAdapter implements IChainAdapter {
@@ -41,6 +42,10 @@ export class MockAdapter implements IChainAdapter {
 
   getStableTokenAddress(): string {
     return this.stableToken.address;
+  }
+
+  async getBatchPoolData(poolAddresses: string[]): Promise<any[]> {
+    return [];
   }
 
   async getTopPools(limit: number): Promise<Pool[]> {

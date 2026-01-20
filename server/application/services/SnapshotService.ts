@@ -63,6 +63,12 @@ export class SnapshotService {
 
     // Filter tokens that need updating (stale or missing)
     const now = Date.now();
+    
+    // Fetch real pool data in batch
+    const pools = await adapter.getTopPools(50);
+    const poolAddresses = pools.map(p => p.address);
+    const poolStates = await adapter.getBatchPoolData(poolAddresses);
+
     const entries: SnapshotEntry[] = await Promise.all(windowedMetadata.map(async (meta) => {
       const cacheKey = `${chainKey}:${meta.address.toLowerCase()}`;
       const cached = this.cache.get(cacheKey) as any;
@@ -71,22 +77,36 @@ export class SnapshotService {
         return cached.entry;
       }
 
-      // Generate "fresh" data via adapter logic
-      // In a real RPC app, we would batch these 25 tokens in one call here
-      const pools = await adapter.getTopPools(100); // Get all pools once
-      const pool = pools.find(p => p.token0.address.toLowerCase() === meta.address.toLowerCase() || p.token1.address.toLowerCase() === meta.address.toLowerCase());
+      // Match token to discovered pools
+      const stableAddress = adapter.getStableTokenAddress().toLowerCase();
+      const metaAddress = meta.address.toLowerCase();
       
-      const stableAddress = adapter.getStableTokenAddress();
+      const poolData = pools.find(p => 
+        (p.token0.address.toLowerCase() === metaAddress && p.token1.address.toLowerCase() === stableAddress) ||
+        (p.token1.address.toLowerCase() === metaAddress && p.token0.address.toLowerCase() === stableAddress)
+      );
+
       let price = 0;
       let liquidity = 0;
 
-      if (pool) {
-        const isToken0Stable = pool.token0.address.toLowerCase() === stableAddress.toLowerCase();
-        const targetToken = isToken0Stable ? pool.token1 : pool.token0;
-        price = computeSpotPrice(pool, targetToken.address, stableAddress);
-        liquidity = computeLiquidityUSD(pool, isToken0Stable ? 1 : price, isToken0Stable ? price : 1);
-      } else {
-        // Fallback for mock stability
+      if (poolData) {
+        const state = poolStates.find((s: any) => s.address === poolData.address);
+        if (state) {
+          const enrichedPool = { 
+            ...poolData, 
+            sqrtPriceX96: state.sqrtPriceX96, 
+            liquidity: state.liquidity,
+            // Ensure token decimals are correct for pricing
+            token0: poolData.token0.address.toLowerCase() === metaAddress ? { ...meta } : { symbol: "USDC", name: "USD Coin", address: stableAddress, decimals: 6 },
+            token1: poolData.token1.address.toLowerCase() === metaAddress ? { ...meta } : { symbol: "USDC", name: "USD Coin", address: stableAddress, decimals: 6 }
+          };
+          price = computeSpotPrice(enrichedPool, meta.address, stableAddress);
+          liquidity = Number(state.liquidity) / 1e18; // Normalized liquidity
+        }
+      }
+
+      // If no real pool found, use mock fallback for prototype visibility
+      if (price === 0) {
         price = 1; 
         liquidity = 500000;
       }

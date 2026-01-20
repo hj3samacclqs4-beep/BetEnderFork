@@ -37,7 +37,9 @@ export class EthersAdapter implements IChainAdapter {
 
   async getTopPools(limit: number): Promise<Pool[]> {
     try {
-      // Etherscan V2 Discovery: Query for pools involving our stable token
+      // Etherscan V2 Discovery: Query for top liquidity pools
+      // We'll use the tokenholderlist on the stable token as a proxy for pool discovery
+      // In a more advanced version, we'd use a dedicated V2 liquidity endpoint
       const response = await fetch(`https://api.etherscan.io/v2/api?chainid=1&module=token&action=tokenholderlist&address=${this.stableTokenAddress}&apikey=${this.etherscanApiKey}`);
       
       if (!response.ok) return [];
@@ -45,15 +47,53 @@ export class EthersAdapter implements IChainAdapter {
       const data = await response.json();
       if (data.status !== "1" || !Array.isArray(data.result)) return [];
 
-      // Map top holders to potential pool addresses
-      const pools: Pool[] = data.result.slice(0, limit).map((holder: any) => ({
-        address: holder.address,
-        token0: { symbol: "USDC", name: "USD Coin", address: this.stableTokenAddress, decimals: 6 },
-        token1: { symbol: "TOKEN", name: "Unknown Token", address: "0x0000000000000000000000000000000000000000", decimals: 18 },
-        reserve0: BigInt(0),
-        reserve1: BigInt(0),
-        feeTier: 3000
-      }));
+      // Filter for addresses that look like pools (usually top holders of USDC)
+      const potentialPools = data.result.slice(0, limit).map((holder: any) => holder.address);
+      
+      // Fetch pool details (token0, token1) via Multicall
+      const poolInterface = new ethers.Interface([
+        "function token0() view returns (address)",
+        "function token1() view returns (address)",
+        "function fee() view returns (uint24)"
+      ]);
+
+      const multicall = new ethers.Contract(MULTICALL_ADDRESS, MULTICALL_ABI, this.provider);
+      const calls = potentialPools.flatMap((address: string) => [
+        { target: address, callData: poolInterface.encodeFunctionData("token0") },
+        { target: address, callData: poolInterface.encodeFunctionData("token1") },
+        { target: address, callData: poolInterface.encodeFunctionData("fee") }
+      ]);
+
+      const [, returnData] = await multicall.aggregate(calls);
+      
+      const pools: Pool[] = [];
+      for (let i = 0; i < potentialPools.length; i++) {
+        try {
+          const res = returnData[i * 3];
+          if (!res || res === "0x") continue;
+          
+          const t0 = poolInterface.decodeFunctionResult("token0", res)[0];
+          const t1 = poolInterface.decodeFunctionResult("token1", returnData[i * 3 + 1])[0];
+          const fee = poolInterface.decodeFunctionResult("fee", returnData[i * 3 + 2])[0];
+          
+          // Verify one of the tokens is our stable token
+          if (t0.toLowerCase() !== this.stableTokenAddress.toLowerCase() && 
+              t1.toLowerCase() !== this.stableTokenAddress.toLowerCase()) {
+            continue;
+          }
+
+          pools.push({
+            address: potentialPools[i],
+            token0: { symbol: "...", name: "...", address: t0, decimals: 18 },
+            token1: { symbol: "...", name: "...", address: t1, decimals: 18 },
+            reserve0: BigInt(0),
+            reserve1: BigInt(0),
+            feeTier: Number(fee)
+          });
+        } catch (e) {
+          continue;
+        }
+      }
       
       return pools;
     } catch (error) {
