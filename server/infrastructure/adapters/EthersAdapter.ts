@@ -21,10 +21,18 @@ export class EthersAdapter implements IChainAdapter {
   private etherscanApiKey: string;
 
   constructor(chainName: string, rpcUrl: string, stableTokenAddress: string, etherscanApiKey: string) {
+    console.log(`Initializing ${chainName} adapter with RPC: ${rpcUrl.substring(0, 20)}...`);
     this.chainName = chainName;
     this.provider = new ethers.JsonRpcProvider(rpcUrl);
     this.stableTokenAddress = stableTokenAddress;
     this.etherscanApiKey = etherscanApiKey;
+    
+    // Test provider connection immediately
+    this.provider.getNetwork().then(network => {
+      console.log(`Connected to network: ${network.name} (${network.chainId})`);
+    }).catch(err => {
+      console.error(`Failed to connect to RPC for ${chainName}:`, err);
+    });
   }
 
   getChainName(): string {
