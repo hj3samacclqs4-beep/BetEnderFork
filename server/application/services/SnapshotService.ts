@@ -81,7 +81,7 @@ export class SnapshotService {
       let liquidity = 0;
 
       if (pool) {
-        const isToken0Stable = pool.token0.address === stableAddress;
+        const isToken0Stable = pool.token0.address.toLowerCase() === stableAddress.toLowerCase();
         const targetToken = isToken0Stable ? pool.token1 : pool.token0;
         price = computeSpotPrice(pool, targetToken.address, stableAddress);
         liquidity = computeLiquidityUSD(pool, isToken0Stable ? 1 : price, isToken0Stable ? price : 1);

@@ -40,12 +40,25 @@ export class EthersAdapter implements IChainAdapter {
       // In a real implementation with Etherscan V2:
       // 1. Query Etherscan V2 for top pools by volume/liquidity
       // 2. Filter for those involving our tokens
-      // For this implementation, we'll focus on the Multicall state fetching logic
+      // For this prototype, we'll return an empty list or implement discovery logic
       return [];
     } catch (error) {
       console.error(`Error fetching pools for ${this.chainName}:`, error);
       return [];
     }
+  }
+
+  async getPoolStateV3(poolAddress: string): Promise<Partial<Pool>> {
+    const poolContract = new ethers.Contract(poolAddress, POOL_ABI, this.provider);
+    const [slot0, liquidity] = await Promise.all([
+      poolContract.slot0(),
+      poolContract.liquidity()
+    ]);
+
+    return {
+      sqrtPriceX96: BigInt(slot0.sqrtPriceX96.toString()),
+      liquidity: BigInt(liquidity.toString())
+    };
   }
 
   /**

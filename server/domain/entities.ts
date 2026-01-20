@@ -15,6 +15,8 @@ export interface Pool {
   reserve0: bigint;
   reserve1: bigint;
   feeTier: number;
+  sqrtPriceX96?: bigint;
+  liquidity?: bigint;
 }
 
 export interface SnapshotEntry {
