@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useSnapshot } from "@/hooks/use-snapshots";
-import { ChainSelector } from "@/components/ChainSelector";
 import { TokenTable } from "@/components/TokenTable";
 import { StatsCard } from "@/components/StatsCard";
 import { Activity, Coins, Globe, History, RefreshCcw, Search } from "lucide-react";
@@ -9,7 +8,6 @@ import { formatDistanceToNow } from "date-fns";
 import { Input } from "@/components/ui/input";
 
 export default function Dashboard() {
-  const [chain, setChain] = useState<string>("ethereum");
   const [searchQuery, setSearchQuery] = useState("");
   const { 
     data, 
@@ -20,7 +18,7 @@ export default function Dashboard() {
     isError, 
     error, 
     isRefetching 
-  } = useSnapshot(chain);
+  } = useSnapshot("polygon");
 
   // Flatten all pages of entries
   const allEntries = data?.pages.flatMap(page => page.entries) || [];
@@ -62,7 +60,6 @@ export default function Dashboard() {
               <span className={`w-2 h-2 rounded-full mr-2 ${isRefetching ? 'bg-amber-400 animate-pulse' : 'bg-green-500'}`}></span>
               {isRefetching ? 'Syncing...' : 'Live'}
             </div>
-            <ChainSelector selectedChain={chain} onSelectChain={setChain} />
           </div>
         </div>
       </header>

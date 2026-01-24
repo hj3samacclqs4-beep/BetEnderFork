@@ -19,23 +19,32 @@ const POOL_ABI = [
 ];
 
 export class EthersAdapter {
-  private provider: ethers.JsonRpcProvider;
+  private providers: { [chainId: number]: ethers.JsonRpcProvider };
   private factory: ethers.Contract;
 
-  constructor(rpcUrl: string) {
-    this.provider = new ethers.JsonRpcProvider(rpcUrl);
-    this.factory = new ethers.Contract(UNISWAP_V3_FACTORY, FACTORY_ABI, this.provider);
+  constructor(rpcUrls: { [chainId: number]: string }) {
+    this.providers = {};
+    for (const chainId in rpcUrls) {
+      this.providers[chainId] = new ethers.JsonRpcProvider(rpcUrls[chainId]);
+    }
+    // The factory address is the same for both Ethereum and Polygon
+    this.factory = new ethers.Contract(UNISWAP_V3_FACTORY, FACTORY_ABI, this.providers[1]);
   }
 
-  async getChainId(): Promise<number> {
-    const network = await this.provider.getNetwork();
-    return Number(network.chainId);
+  private getProvider(chainId: number): ethers.JsonRpcProvider {
+    const provider = this.providers[chainId];
+    if (!provider) {
+      throw new Error(`Provider for chain ID ${chainId} not configured.`);
+    }
+    return provider;
   }
 
-  async getPoolAddress(tokenA: Token, tokenB: Token): Promise<string | null> {
+  async getPoolAddress(tokenA: Token, tokenB: Token, chainId: number): Promise<string | null> {
+    const provider = this.getProvider(chainId);
+    const factory = this.factory.connect(provider);
     const feeTiers = [100, 500, 3000, 10000]; // Common Uniswap V3 fee tiers
     for (const fee of feeTiers) {
-      const poolAddress = await this.factory.getPool(tokenA.address, tokenB.address, fee);
+      const poolAddress = await factory.getPool(tokenA.address, tokenB.address, fee);
       if (poolAddress && poolAddress !== "0x0000000000000000000000000000000000000000") {
         return poolAddress;
       }
@@ -43,10 +52,11 @@ export class EthersAdapter {
     return null;
   }
 
-  async getBatchPoolData(poolAddresses: string[]): Promise<any[]> {
+  async getBatchPoolData(poolAddresses: string[], chainId: number): Promise<any[]> {
     if (poolAddresses.length === 0) return [];
 
-    const multicall = new ethers.Contract(MULTICALL_ADDRESS, MULTICALL_ABI, this.provider);
+    const provider = this.getProvider(chainId);
+    const multicall = new ethers.Contract(MULTICALL_ADDRESS, MULTICALL_ABI, provider);
     const poolInterface = new ethers.Interface(POOL_ABI);
 
     const validAddresses = poolAddresses.filter(addr => addr && ethers.isAddress(addr));

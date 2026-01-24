@@ -12,8 +12,8 @@ This document outlines the development plan to refactor the application into a s
 - **Alignment:** Refactor
 - *Note: The current app supports multiple chains. This step simplifies the codebase by removing all logic not related to Ethereum and Polygon, which is a prerequisite for the new focused design.*
 - [ ] Review `shared/tokens.ts` and remove chain configurations other than Ethereum and Polygon.
-- [ ] Update `client/src/components/ChainSelector.tsx` to remove the component entirely.
-- [ ] Refactor `server/infrastructure/adapters/EthersAdapter.ts` to remove logic for connecting to unsupported chains.
+- [X] Update `client/src/components/ChainSelector.tsx` to remove the component entirely.
+- [X] Refactor `server/infrastructure/adapters/EthersAdapter.ts` to remove logic for connecting to unsupported chains.
 - [ ] Clean up any other constants or configurations in the codebase related to now-removed chains.
 - [ ] Verify that `server/routes.ts` is updated to remove the `:chain` parameter from API endpoints.
 
