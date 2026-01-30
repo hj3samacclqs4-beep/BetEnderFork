@@ -15,7 +15,14 @@ export default function Dashboard() {
     queryKey: ['tokens', selectedNetwork],
     queryFn: async () => {
       const res = await fetch(api.tokens.getAll.path);
-      return res.json();
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      const data = await res.json();
+      if (!data || !Array.isArray(data.tokens)) {
+        throw new Error('Invalid response format');
+      }
+      return data;
     },
   });
 
@@ -41,7 +48,7 @@ export default function Dashboard() {
   };
 
   if (error) {
-    return <div className="p-8 text-red-600">Error loading tokens.</div>;
+    return <div className="p-8 text-red-600">Error loading tokens: {error instanceof Error ? error.message : 'Unknown error'}</div>;
   }
 
   return (
