@@ -65,9 +65,11 @@ class SpotPricingEngine {
    */
   public async computeSpotPrice(tokenAddress: string, chainId: number): Promise<number | null> {
     const normalizedToken = tokenAddress.toLowerCase();
+    const tokenShort = tokenAddress.slice(0, 6);
 
     // If it's a stablecoin, return $1
     if (this.isUsdStablecoin(normalizedToken, chainId)) {
+      console.log(`✓ [PRICING] ${tokenShort}... is USD stablecoin → $1.00`);
       return 1.0;
     }
 
@@ -76,16 +78,27 @@ class SpotPricingEngine {
     const routes = poolRegistry.pricingRoutes[normalizedToken];
 
     if (!routes || routes.length === 0) {
-      console.log(`  💰 No pricing routes for ${tokenAddress.slice(0,10)}... on chain ${chainId}`);
+      console.log(`❌ [PRICING] ${tokenShort}... on chain ${chainId} → NO ROUTES (not discovered)`);
       return null; // No pricing route for this token
     }
+    
+    console.log(`ℹ️ [PRICING] ${tokenShort}... has ${routes.length} pricing route(s)`);
 
     // Find a route to a USD stablecoin with cached pool state
     let bestRoute = null;
+    let stablecoinRouteCount = 0;
+    let cachedRouteCount = 0;
+    
     for (const route of routes) {
       const poolState = sharedStateCache.getPoolState(route.pool);
-      if (poolState && this.isUsdStablecoin(route.base, chainId)) {
+      const isStablecoin = this.isUsdStablecoin(route.base, chainId);
+      
+      if (isStablecoin) stablecoinRouteCount++;
+      if (poolState) cachedRouteCount++;
+      
+      if (poolState && isStablecoin) {
         bestRoute = route;
+        console.log(`✓ [PRICING] ${tokenShort}... found CACHED stablecoin route (pool: ${route.pool.slice(0,6)}...)`);
         break; // Found a stablecoin route with cached pool
       }
     }
@@ -95,15 +108,16 @@ class SpotPricingEngine {
       for (const route of routes) {
         const poolState = sharedStateCache.getPoolState(route.pool);
         if (poolState) {
+          const baseAddr = route.base.slice(0, 6);
           bestRoute = route;
+          console.log(`⚠️ [PRICING] ${tokenShort}... using non-stablecoin route (base: ${baseAddr}..., will recurse)`);
           break;
         }
       }
     }
 
     if (!bestRoute) {
-      // Don't log if it's a known frequent failure to avoid log noise
-      // console.log(`  💰 No cached pool state for ${tokenAddress.slice(0,10)}... on chain ${chainId}`);
+      console.log(`❌ [PRICING] ${tokenShort}... → NO CACHED POOLS (${cachedRouteCount}/${routes.length} cached, ${stablecoinRouteCount} stablecoin routes exist)`);
       return null;
     }
 
@@ -142,16 +156,21 @@ class SpotPricingEngine {
 
     // If the base token is a USD stablecoin, this is the USD price
     if (this.isUsdStablecoin(bestRoute.base, chainId)) {
+      console.log(`✓ [PRICING] ${tokenShort}... → $${priceInBaseToken.toFixed(6)} (stablecoin base)`);
       return priceInBaseToken;
     }
 
     // Otherwise, we need to get the USD price of the base token (recursive)
+    console.log(`⚠️ [PRICING] ${tokenShort}... recursing to get base token price (${bestRoute.base.slice(0,6)}...)`);
     const baseUsdPrice = await this.computeSpotPrice(bestRoute.base, chainId);
     if (baseUsdPrice === null) {
+      console.log(`❌ [PRICING] ${tokenShort}... → RECURSIVE BASE PRICE FAILED`);
       return null;
     }
 
-    return priceInBaseToken * baseUsdPrice;
+    const finalPrice = priceInBaseToken * baseUsdPrice;
+    console.log(`✓ [PRICING] ${tokenShort}... → $${finalPrice.toFixed(6)} (via ${bestRoute.base.slice(0,6)}... @ $${baseUsdPrice.toFixed(6)})`);
+    return finalPrice;
   }
 }
 

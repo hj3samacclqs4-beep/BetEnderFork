@@ -15,23 +15,50 @@ export async function registerRoutes(
   // Initialize services
   const marketViewerService = createMarketViewerService(app.locals.storageService);
   const apiLogger = getApiCallLogger();
+  const TOKENS_PER_PAGE = 15;
 
   app.get(api.tokens.getAll.path, async (req, res) => {
     try {
-      // Get chainId from query parameter (default to Polygon if not specified)
-      const chainId = req.query.chainId ? Number(req.query.chainId) : 137;
+      // Get chainId from query parameter (REQUIRED - no default)
+      const chainId = req.query.chainId ? Number(req.query.chainId) : null;
+      if (!chainId || (chainId !== 1 && chainId !== 137)) {
+        return res.status(400).json({ message: "chainId is required and must be 1 (Ethereum) or 137 (Polygon)" });
+      }
       
-      // COLD PATH: Fetch tokens and attach pool metadata
+      // Get pagination parameters
+      const page = req.query.page ? Math.max(1, Number(req.query.page)) : 1;
+      console.log(`📋 Fetching tokens: chain=${chainId}, page=${page}, pageSize=${TOKENS_PER_PAGE}`);
+      
+      // COLD PATH: Fetch ONLY tokens for selected network
       const tokens = await app.locals.storageService.getTokensByNetwork(chainId);
       const poolRegistry = await app.locals.storageService.getPoolRegistry(chainId);
       
-      // Attach pricing pools to each token (cold path responsibility)
-      const tokensWithPools = tokens.map(token => ({
-        ...token,
-        pricingPools: poolRegistry.pricingRoutes[token.address.toLowerCase()] || [],
-      }));
+      // Calculate pagination
+      const startIndex = (page - 1) * TOKENS_PER_PAGE;
+      const paginatedTokens = tokens.slice(startIndex, startIndex + TOKENS_PER_PAGE);
       
-      res.json({ tokens: tokensWithPools, chainId });
+      console.log(`✓ Token pagination: ${paginatedTokens.length} tokens returned (total: ${tokens.length}, page: ${page})`);
+      
+      // Attach pricing pools to each token (cold path responsibility)
+      const tokensWithPools = paginatedTokens.map((token: any) => {
+        const pools = poolRegistry.pricingRoutes[token.address.toLowerCase()] || [];
+        console.log(`   Token ${startIndex + paginatedTokens.indexOf(token) + 1}: ${token.symbol.padEnd(6)} ${token.address.slice(0,8)}... → ${pools.length} pricing route(s)`);
+        return {
+          ...token,
+          pricingPools: pools,
+        };
+      });
+      
+      res.json({ 
+        tokens: tokensWithPools, 
+        chainId,
+        pagination: {
+          currentPage: page,
+          pageSize: TOKENS_PER_PAGE,
+          totalTokens: tokens.length,
+          totalPages: Math.ceil(tokens.length / TOKENS_PER_PAGE),
+        }
+      });
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: "Internal server error" });

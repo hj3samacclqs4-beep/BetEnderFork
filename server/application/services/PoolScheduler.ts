@@ -20,7 +20,7 @@
  * - Results processed for tier updates and caching
  */
 
-import { poolController } from './PoolController';
+import { poolController, AlivePool } from './PoolController';
 import { sharedStateCache } from './SharedStateCache';
 import { MulticallEngine } from './MulticallEngine';
 import { StorageService } from './StorageService';
@@ -85,6 +85,8 @@ export class PoolScheduler {
       return; // Nothing to do
     }
 
+    console.log(`⚡ [SCHEDULER] ${poolsDue.length} pool(s) due for refresh`);
+
     // Group pools by chainId
     const poolsByChain = new Map<number, typeof poolsDue>();
     for (const pool of poolsDue) {
@@ -117,7 +119,7 @@ export class PoolScheduler {
     const poolRegistry = await this.storageService.getPoolRegistry(chainId);
 
     // PHASE 4: Create weight-aware batches
-    const batches = this.multicallEngine.createBatches(poolsDue, chainId, poolRegistry);
+    const batches = this.multicallEngine.createBatches(poolsDue as AlivePool[], chainId, poolRegistry);
     console.log(`📦 Created ${batches.length} batch(es) for execution`);
 
     // PHASE 4: Execute all batches with round-robin distribution
@@ -140,39 +142,12 @@ export class PoolScheduler {
           // PHASE 5: Check if block number changed
           if (result.blockNumber === pool?.lastBlockSeen && result.blockNumber !== 0) {
             // Block unchanged - state unchanged, skip pricing computation
-            console.log(
-              `  ⚡ ${result.poolAddress.slice(0, 6)}... → block ${result.blockNumber} unchanged, skipping pricing`
-            );
             blockAwareSavings++;
-
-            // Just extend cache TTL
-            sharedStateCache.setPoolState(result.poolAddress, {
-              address: result.poolAddress,
-              sqrtPriceX96: result.data.sqrtPriceX96,
-              liquidity: result.data.liquidity,
-              token0: result.data.token0,
-              token1: result.data.token1,
-              timestamp: Date.now(),
-              // PHASE 6: Include tick ID and block number
-              tickId,
-              blockNumber: result.blockNumber,
-            });
           } else {
             // Block changed - recompute price
             computationsPerformed++;
-
-            // Update cache with new pool state
-            sharedStateCache.setPoolState(result.poolAddress, {
-              address: result.poolAddress,
-              sqrtPriceX96: result.data.sqrtPriceX96,
-              liquidity: result.data.liquidity,
-              token0: result.data.token0,
-              token1: result.data.token1,
-              timestamp: Date.now(),
-              // PHASE 6: Include tick ID and block number
-              tickId,
-              blockNumber: result.blockNumber,
-            });
+            
+            console.log(`✓ [CACHE] Pool ${result.poolAddress.slice(0, 6)}... cached (sqrtPrice: ${result.data.sqrtPriceX96.toString().slice(0, 16)}...)`);
 
             // Update pool tier based on price change
             if (pool) {

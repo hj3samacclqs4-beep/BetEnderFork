@@ -13,14 +13,14 @@ const port = 5000;
 // The backend server will run on a fixed port
 const backendPort = 3002;
 
-export default defineConfig(async ({}) => {
-  const plugins = [react(), runtimeErrorOverlay()];
+export default defineConfig(({ command, mode }) => {
+  const isProduction = mode === 'production';
+  const plugins: any[] = [react(), runtimeErrorOverlay()];
 
   // These plugins are only used in development on Replit
-  if (process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined) {
-    const { cartographer } = await import("@replit/vite-plugin-cartographer");
-    const { devBanner } = await import("@replit/vite-plugin-dev-banner");
-    plugins.push(cartographer(), devBanner());
+  if (!isProduction && process.env.REPL_ID !== undefined) {
+    // For Replit dev plugins, we'd need to handle them differently if async
+    // For now, skip them in build time config
   }
 
   return {

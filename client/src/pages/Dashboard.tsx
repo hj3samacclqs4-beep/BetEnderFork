@@ -8,14 +8,22 @@ import { Sidebar, SidebarProvider } from '@/components/ui/sidebar';
 
 export default function Dashboard() {
   const [selectedNetwork, setSelectedNetwork] = useState<number>(137); // Default to Polygon
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
-  const { data: tokens, isLoading, error } = useQuery<{
+  const { data: tokensData, isLoading, error } = useQuery<{
     tokens: TokenMetadata[];
+    pagination: {
+      currentPage: number;
+      pageSize: number;
+      totalTokens: number;
+      totalPages: number;
+    };
   }>({
-    queryKey: ['tokens', selectedNetwork],
+    queryKey: ['tokens', selectedNetwork, currentPage],
     queryFn: async () => {
       const url = new URL(api.tokens.getAll.path, window.location.origin);
       url.searchParams.append('chainId', String(selectedNetwork));
+      url.searchParams.append('page', String(currentPage));
       const res = await fetch(url.toString());
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -28,7 +36,13 @@ export default function Dashboard() {
     },
   });
 
-  const mockMarketTokens = tokens?.tokens?.map(token => ({
+  // Reset to page 1 when network changes
+  const handleNetworkChange = (newNetwork: number) => {
+    setSelectedNetwork(newNetwork);
+    setCurrentPage(1);
+  };
+
+  const mockMarketTokens = tokensData?.tokens?.map(token => ({
     address: token.address,
     symbol: token.symbol,
     name: token.symbol, // In a real app, fetch from metadata
@@ -64,7 +78,7 @@ export default function Dashboard() {
               <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
                 DEX Aggregator
               </h1>
-              <NetworkSelector selectedNetwork={selectedNetwork} onNetworkChange={setSelectedNetwork} />
+              <NetworkSelector selectedNetwork={selectedNetwork} onNetworkChange={handleNetworkChange} />
             </div>
           </div>
 
@@ -72,13 +86,40 @@ export default function Dashboard() {
           <div className="px-8 py-8">
             {/* Swap Card */}
             <div className="mb-12">
-              <SwapInterface tokens={tokens?.tokens || []} chainId={selectedNetwork} />
+              <SwapInterface tokens={tokensData?.tokens || []} chainId={selectedNetwork} />
             </div>
             {/* Market Overview */}
             {isLoading ? (
               <div className="text-center py-12 text-gray-500">Loading tokens...</div>
             ) : (
-              <TokenMarketView chainId={selectedNetwork} />
+              <>
+                <TokenMarketView chainId={selectedNetwork} />
+                {/* Pagination Controls */}
+                {tokensData?.pagination && tokensData.pagination.totalPages > 1 && (
+                  <div className="mt-8 flex items-center justify-between bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                    <div className="text-sm text-gray-600">
+                      Page {tokensData.pagination.currentPage} of {tokensData.pagination.totalPages}
+                      {' '}({tokensData.pagination.totalTokens} total tokens)
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(tokensData.pagination.totalPages, p + 1))}
+                        disabled={currentPage === tokensData.pagination.totalPages}
+                        className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </main>
